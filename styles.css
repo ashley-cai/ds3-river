@@ -1,0 +1,8 @@
+body {
+    background-color: black;
+}
+
+.river-depth {
+    height: 10000vh;
+    background-image: linear-gradient(#529BE0, #666810);
+}
