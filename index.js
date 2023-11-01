@@ -17,11 +17,12 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 			let mousePointer = new THREE.Vector2();
 			let raycaster = new THREE.Raycaster();
 			let BLOOM_SCENE, bloomLayer, params;
+			let darkMaterial, lightMaterial, materials;
+			let renderScene, bloomPass, bloomComposer, mixPass, outputPass, finalComposer;
 
 			init();
 			animate();
 
-			const LightMaterial = new THREE.MeshBasicMaterial( { color: 'white' } );
 
 
 			function init() {
@@ -40,12 +41,16 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 					exposure: 1
 				};
 
+				lightMaterial = new THREE.MeshBasicMaterial( { color: 'white' } );
+				darkMaterial = new THREE.MeshBasicMaterial( { color: 'black' } );
+				materials = {};
 				//
 
 				renderer = new THREE.WebGLRenderer();
 				renderer.setPixelRatio( window.devicePixelRatio );
 				renderer.setSize( window.innerWidth, window.innerHeight );
-				renderer.toneMapping = THREE.ACESFilmicToneMapping;
+				// renderer.toneMapping = THREE.ACESFilmicToneMapping;
+				renderer.toneMapping = THREE.ReinhardToneMapping;
 				renderer.toneMappingExposure = 0.5;
 				container.appendChild( renderer.domElement );
 
@@ -55,6 +60,43 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 				camera = new THREE.PerspectiveCamera( 55, window.innerWidth / window.innerHeight, 1, 500 );
 				camera.position.set( 30, 30, 100 );
+
+				//bloom
+				renderScene = new RenderPass( scene, camera );
+
+				bloomPass = new UnrealBloomPass( new THREE.Vector2( window.innerWidth, window.innerHeight ), 1.5, 0.4, 0.85 );
+				bloomPass.threshold = params.threshold;
+				bloomPass.strength = params.strength;
+				bloomPass.radius = params.radius;
+
+				bloomComposer = new EffectComposer( renderer );
+				bloomComposer.renderToScreen = false;
+				bloomComposer.addPass( renderScene );
+				bloomComposer.addPass( bloomPass );
+
+				mixPass = new ShaderPass(
+					new THREE.ShaderMaterial( {
+						uniforms: {
+							baseTexture: { value: null },
+							bloomTexture: { value: bloomComposer.renderTarget2.texture }
+						},
+						vertexShader: document.getElementById( 'vertexshader' ).textContent,
+						fragmentShader: document.getElementById( 'fragmentshader' ).textContent,
+						defines: {}
+					} ), 'baseTexture'
+				);
+				mixPass.needsSwap = true;
+
+				outputPass = new OutputPass();
+
+				finalComposer = new EffectComposer( renderer );
+				finalComposer.addPass( renderScene );
+				finalComposer.addPass( mixPass );
+				finalComposer.addPass( outputPass );
+
+				//
+
+				scene.traverse( disposeMaterial );
 
 				//
 
@@ -150,14 +192,14 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
         {
          console.log('scrolling up');
 		 if (camera.position.y < 30) {
-         	camera.position.y += 5;
+         	camera.position.y += .5;
 		 }
         }
         else if (e.deltaY > 0)
         {
          console.log('scrolling down');
          if (camera.position.y > -100) {
-            camera.position.y -= 5;
+            camera.position.y -= .5;
         }
         }
       }, true);
@@ -178,7 +220,10 @@ function onMouseMove(event) {
 
 		objects.forEach((object) => {
 			console.log(object);
-			object.material = LightMaterial;
+			// object.material = lightMaterial;
+			object.layers.toggle( BLOOM_SCENE );
+			render();
+
 		});
 }
 
@@ -209,6 +254,10 @@ function onWindowResize() {
 
     renderer.setSize( window.innerWidth, window.innerHeight );
 
+	bloomComposer.setSize( width, height );
+	finalComposer.setSize( width, height );
+
+	render();
 }
 
 function animate() {
@@ -224,7 +273,13 @@ function render() {
     const time = performance.now() * 0.001;
     water.material.uniforms[ 'time' ].value += 1.0 / 60.0;
 
-    renderer.render( scene, camera );
+	scene.traverse( darkenNonBloomed );
+	bloomComposer.render();
+	scene.traverse( restoreMaterial );
+
+	finalComposer.render();
+
+    // renderer.render( scene, camera );
 
 }
 
@@ -245,4 +300,36 @@ function checkRayIntersections(mousePointer, camera, raycaster, scene, getFirstV
     intersections = getFirstValue ? intersections[0] : intersections;
 
     return intersections;
+}
+
+function darkenNonBloomed( obj ) {
+
+	if ( obj.isMesh && bloomLayer.test( obj.layers ) === false ) {
+
+		materials[ obj.uuid ] = obj.material;
+		obj.material = darkMaterial;
+
+	}
+
+}
+
+function restoreMaterial( obj ) {
+
+	if ( materials[ obj.uuid ] ) {
+
+		obj.material = materials[ obj.uuid ];
+		delete materials[ obj.uuid ];
+
+	}
+
+}
+
+function disposeMaterial( obj ) {
+
+	if ( obj.material ) {
+
+		obj.material.dispose();
+
+	}
+
 }
