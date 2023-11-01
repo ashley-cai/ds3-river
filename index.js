@@ -1,10 +1,14 @@
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as THREE from 'three';
 import Stats from 'three/addons/libs/stats.module.js';
-import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Water } from 'three/addons/objects/Water.js';
-import { Sky } from 'three/addons/objects/Sky.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
 
 			let container, stats;
 			let camera, scene, renderer;
@@ -12,13 +16,29 @@ import { Sky } from 'three/addons/objects/Sky.js';
 			let scooter;
 			let mousePointer = new THREE.Vector2();
 			let raycaster = new THREE.Raycaster();
+			let BLOOM_SCENE, bloomLayer, params;
 
 			init();
 			animate();
 
+			const LightMaterial = new THREE.MeshBasicMaterial( { color: 'white' } );
+
+
 			function init() {
 
 				container = document.getElementById( 'container' );
+
+				// bloom
+				BLOOM_SCENE = 1;
+				bloomLayer = new THREE.Layers();
+				bloomLayer.set( BLOOM_SCENE );
+	
+				params = {
+					threshold: 0,
+					strength: 1,
+					radius: 0.5,
+					exposure: 1
+				};
 
 				//
 
@@ -68,16 +88,18 @@ import { Sky } from 'three/addons/objects/Sky.js';
 
             // ground
 
-				const groundGeometry = new THREE.PlaneGeometry( 1000, 1000, 1, 1 );
+				const groundGeometry = new THREE.PlaneGeometry( 1000, 3000, 1, 1 );
 				const groundMaterial = new THREE.MeshBasicMaterial( { color: 0xe7e7e7 } );
 				const ground = new THREE.Mesh( groundGeometry, groundMaterial );
 				ground.rotation.x = Math.PI / 2;
+				ground.name = "plane";
 				scene.add( ground );
 			
 			//depth
                 const depthGeometry = new THREE.PlaneGeometry( 1000, 1000, 1, 1 );
 				const depthMaterial = new THREE.MeshBasicMaterial( { color: 0x3F3F3F } );
 				const depth = new THREE.Mesh( depthGeometry, depthMaterial );
+				depth.name = "plane";
 				depth.position.set(0, 0, -50);
 				scene.add( depth );
 
@@ -98,16 +120,24 @@ import { Sky } from 'three/addons/objects/Sky.js';
         container.appendChild( stats.dom );
     
     //ambient light
-    const light = new THREE.AmbientLight( 0x404040 ); // soft white light
-    light.intensity = 50;
+    const light = new THREE.AmbientLight( 0x686925 ); // soft white light 404040
+    light.intensity = 30;
     scene.add( light );
 
     //import scooter
     const loader = new GLTFLoader();
-    loader.load( 'models/scooter.glb', function ( gltf ) {
-		scooter = gltf;
-        gltf.scene.position.set(30, -100, 80);
+    loader.load( 'models/scooter.glb', function ( gltf ) {        gltf.scene.position.set(30, -100, 80);
 		gltf.scene.scale.set(15, 15, 15);
+		scene.add( gltf.scene );
+		scene.add( gltf.scene );
+    }, undefined, function ( error ) {
+        console.error( error );
+	} );
+
+    //import battery
+    loader.load( 'models/battery.glb', function ( gltf ) {
+        gltf.scene.position.set(30, -100, 70);
+		gltf.scene.scale.set(40, 40, 40);
         scene.add( gltf.scene );
     }, undefined, function ( error ) {
         console.error( error );
@@ -120,14 +150,14 @@ import { Sky } from 'three/addons/objects/Sky.js';
         {
          console.log('scrolling up');
 		 if (camera.position.y < 30) {
-         	camera.position.y += .5;
+         	camera.position.y += 5;
 		 }
         }
         else if (e.deltaY > 0)
         {
          console.log('scrolling down');
          if (camera.position.y > -100) {
-            camera.position.y -= .5;
+            camera.position.y -= 5;
         }
         }
       }, true);
@@ -144,13 +174,33 @@ function onMouseMove(event) {
 
 		const intersections = checkRayIntersections(mousePointer, camera, raycaster, scene, getFirstValue);
 
-		intersections.forEach((object) => {
+		let objects = getHoveredObjects(intersections);
+
+		objects.forEach((object) => {
 			console.log(object);
-			object.scene.scale.set(30,30,30);
-			scene.add( object.scene );
+			object.material = LightMaterial;
 		});
 }
 
+export function getHoveredObjects(objectList){
+    const cardObjects = [];
+
+    //If it's not an array return the value
+    if(!Array.isArray(objectList)){
+        const objectName = objectList.object.name || "Unnamed Object";
+		if (objectName != "plane") {
+        	cardObjects.push(objectList.object);
+		}
+        return cardObjects;
+    }
+
+    objectList.forEach((object) => {
+        const objectName = object.object.name || "Unnamed Object";
+	        cardObjects.push(object.object);
+    });
+
+    return cardObjects;
+}
 
 function onWindowResize() {
 
