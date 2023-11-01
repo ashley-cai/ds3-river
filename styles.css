@@ -1,6 +1,13 @@
-/* body {
+body {
     background-color: black;
-} */
+    margin: 0;
+    height: 100%; 
+    overflow: hidden;
+}
+
+.container {
+    height: 100vh;
+}
 
 .river-depth {
     height: 10000vh;
