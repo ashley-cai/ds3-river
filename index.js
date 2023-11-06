@@ -13,12 +13,13 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 			let container, stats;
 			let camera, scene, renderer;
 			let controls, water, sun, mesh;
-			let scooter;
 			let mousePointer = new THREE.Vector2();
 			let raycaster = new THREE.Raycaster();
 			let BLOOM_SCENE, bloomLayer, params;
 			let darkMaterial, lightMaterial, materials;
 			let renderScene, bloomPass, bloomComposer, mixPass, outputPass, finalComposer;
+			let glow;
+			let hitWaterAudio, ambientWaterAudio, interview1audio, interview2audio, interview3audio, interview4audio;
 
 			init();
 			animate();
@@ -36,7 +37,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 	
 				params = {
 					threshold: 0,
-					strength: 1,
+					strength: 2,
 					radius: 0.5,
 					exposure: 1
 				};
@@ -125,12 +126,13 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 				);
 
 				water.rotation.x = - Math.PI / 2;
+				water.name = "plane";
 
 				scene.add( water );
 
             // ground
 
-				const groundGeometry = new THREE.PlaneGeometry( 1000, 3000, 1, 1 );
+				const groundGeometry = new THREE.PlaneGeometry( 1000, 5000, 1, 1 );
 				const groundMaterial = new THREE.MeshBasicMaterial( { color: 0xe7e7e7 } );
 				const ground = new THREE.Mesh( groundGeometry, groundMaterial );
 				ground.rotation.x = Math.PI / 2;
@@ -138,39 +140,52 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 				scene.add( ground );
 			
 			//depth
-                const depthGeometry = new THREE.PlaneGeometry( 1000, 1000, 1, 1 );
-				const depthMaterial = new THREE.MeshBasicMaterial( { color: 0x3F3F3F } );
+                const depthGeometry = new THREE.PlaneGeometry( 1000, 200, 1, 1 );
+				const depthMaterial = new THREE.MeshBasicMaterial( { color: 0x828282 } );
 				const depth = new THREE.Mesh( depthGeometry, depthMaterial );
 				depth.name = "plane";
-				depth.position.set(0, 0, -50);
+				depth.position.set(0, -100, 0);
+				const textureLoaderdepth = new THREE.TextureLoader();
+				textureLoaderdepth.load( 'textures/floors/depth.png', function ( map ) {
+					map.colorSpace = THREE.SRGBColorSpace;
+					depthMaterial.map = map;
+					depthMaterial.needsUpdate = true;
+				} );
 				scene.add( depth );
 
-				// const textureLoader = new THREE.TextureLoader();
-				// textureLoader.load( 'textures/floors/FloorsCheckerboard_S_Diffuse.jpg', function ( map ) {
+			//surface of river
+				const surfaceGeometry = new THREE.PlaneGeometry( 1000, 1000, 1, 1 );
+				const surfaceMaterial = new THREE.MeshBasicMaterial( { color: 0xe7e7e7 } );
+				const surface = new THREE.Mesh( surfaceGeometry, surfaceMaterial );
+				surface.name = "plane";
+				surface.rotation.x = Math.PI / 2;
+				surface.position.set(0, -.1, 0);
+				const textureLoader = new THREE.TextureLoader();
+				textureLoader.load( 'textures/water/surface.jpg', function ( map ) {
+					map.wrapS = THREE.RepeatWrapping;
+					map.wrapT = THREE.RepeatWrapping;
+					map.anisotropy = 16;
+					map.repeat.set( 10, 10 );
+					map.colorSpace = THREE.SRGBColorSpace;
+					surfaceMaterial.map = map;
+					surfaceMaterial.needsUpdate = true;
+				} );
+				scene.add( surface );
 
-				// 	map.wrapS = THREE.RepeatWrapping;
-				// 	map.wrapT = THREE.RepeatWrapping;
-				// 	map.anisotropy = 16;
-				// 	map.repeat.set( 4, 4 );
-				// 	map.colorSpace = THREE.SRGBColorSpace;
-				// 	groundMaterial.map = map;
-				// 	groundMaterial.needsUpdate = true;
-
-				// } );
         
         stats = new Stats();
-        container.appendChild( stats.dom );
+        // container.appendChild( stats.dom );
     
     //ambient light
     const light = new THREE.AmbientLight( 0x686925 ); // soft white light 404040
-    light.intensity = 30;
+    light.intensity = 2;
     scene.add( light );
 
     //import scooter
     const loader = new GLTFLoader();
-    loader.load( 'models/scooter.glb', function ( gltf ) {        gltf.scene.position.set(30, -100, 80);
-		gltf.scene.scale.set(15, 15, 15);
-		scene.add( gltf.scene );
+    loader.load( 'models/scooter.glb', function ( gltf ) {        
+		gltf.scene.position.set(30, -95, 90);
+		gltf.scene.scale.set(200, 200, 200);
 		scene.add( gltf.scene );
     }, undefined, function ( error ) {
         console.error( error );
@@ -178,34 +193,189 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
     //import battery
     loader.load( 'models/battery.glb', function ( gltf ) {
-        gltf.scene.position.set(30, -100, 70);
+        gltf.scene.position.set(35, -120, 70);
 		gltf.scene.scale.set(40, 40, 40);
         scene.add( gltf.scene );
     }, undefined, function ( error ) {
         console.error( error );
 	} );
 
+	//import tripod
+	loader.load( 'models/tripod.glb', function ( gltf ) {
+		gltf.scene.position.set(15, -140, 70);
+		gltf.scene.scale.set(40, 40, 40);
+		scene.add( gltf.scene );
+	}, undefined, function ( error ) {
+		console.error( error );
+	} );
+
+	//import binderclip
+	loader.load( 'models/binderclip.glb', function ( gltf ) {
+		gltf.scene.position.set(45, -90, 70);
+		gltf.scene.scale.set(40, 40, 40);
+		scene.add( gltf.scene );
+	}, undefined, function ( error ) {
+		console.error( error );
+	} );
+
+	//import cone
+	loader.load( 'models/cone.glb', function ( gltf ) {
+		gltf.scene.position.set(25, -160, 70);
+		gltf.scene.scale.set(30, 30, 30);
+		scene.add( gltf.scene );
+	}, undefined, function ( error ) {
+		console.error( error );
+	} );
+
+		//import shoppingcart
+	loader.load( 'models/shopping-cart.glb', function ( gltf ) {
+		gltf.scene.position.set(45, -180, 60);
+		gltf.scene.scale.set(30, 30, 30);
+		scene.add( gltf.scene );
+	}, undefined, function ( error ) {
+		console.error( error );
+	} );
+
+	//SOUND
+	var audioButton = document.getElementById("audio-button");
+	var interview1 = "audio/Ella.m4a";
+	interview1audio = document.createElement("audio");
+	//
+	interview1audio.autoplay = true;
+	interview1audio.loop = true;
+	//
+	interview1audio.load();
+	interview1audio.src = interview1;
+	document.getElementById("audio-container").appendChild(interview1audio);
+
+	var interview2 = "audio/Avalon.m4a";
+	interview2audio = document.createElement("audio");
+	//
+	interview2audio.autoplay = true;
+	interview2audio.loop = true;
+	//
+	interview2audio.load();
+	interview2audio.src = interview2;
+	document.getElementById("audio-container").appendChild(interview2audio);
+
+	var interview3 = "audio/Henry.m4a";
+	interview3audio = document.createElement("audio");
+	//
+	interview3audio.autoplay = true;
+	interview3audio.loop = true;
+	//
+	interview3audio.load();
+	interview3audio.src = interview3;
+	document.getElementById("audio-container").appendChild(interview3audio);
+
+	var interview4 = "audio/Julia.m4a";
+	interview4audio = document.createElement("audio");
+	//
+	interview4audio.autoplay = true;
+	interview4audio.loop = true;
+	//
+	interview4audio.load();
+	interview4audio.src = interview4;
+	document.getElementById("audio-container").appendChild(interview4audio);
+
+
+	audioButton.addEventListener("click", function(e) {
+		interview1audio.play();
+		interview2audio.play();
+		interview3audio.play();
+		interview4audio.play();
+		interview1audio.volume = 1;
+		interview2audio.volume = 1;
+		interview3audio.volume = 1;
+		interview4audio.volume = 1;
+	})
+
+	var hitWater = "audio/enterwater.mp3";
+	hitWaterAudio = document.createElement("audio");
+	hitWaterAudio.load();
+	hitWaterAudio.src = hitWater;
+	document.getElementById("audio-container").appendChild(hitWaterAudio);
+
+	var ambientWater = "audio/ambientwater.mp3";
+	ambientWaterAudio = document.createElement("audio");
+	//
+	ambientWaterAudio.autoplay = true;
+	ambientWaterAudio.loop = true;
+	//
+	ambientWaterAudio.load();
+	ambientWaterAudio.src = ambientWater;
+	document.getElementById("audio-container").appendChild(ambientWaterAudio);
+
+
 	window.addEventListener( 'resize', onWindowResize );
 
+	//SCROLL CONTROL
     window.addEventListener("wheel", function(e) {
+		depthDisplay();
+		depthAudio();
         if (e.deltaY < 0)
         {
-         console.log('scrolling up');
+		//  console.log('scrolling up');
 		 if (camera.position.y < 30) {
          	camera.position.y += .5;
 		 }
         }
         else if (e.deltaY > 0)
         {
-         console.log('scrolling down');
-         if (camera.position.y > -100) {
+		//  console.log(camera.position.y)
+        //  console.log('scrolling down');
+         if (camera.position.y > -175) {
+			if (camera.position.y == 0) {
+				enterWater();
+			}
             camera.position.y -= .5;
         }
+
         }
       }, true);
 
 	//Add listener to call onMouseMove every time the mouse moves in the browser window
 	window.addEventListener('mousemove', onMouseMove);
+}
+
+function exitWater(){
+
+}
+
+function enterWater(){
+	hitWaterAudio.play();
+	ambientWaterAudio.play();
+	ambientWaterAudio.volume = 1;
+}
+
+function depthAudio(){
+	let volume = .3+.003*camera.position.y;
+	if (volume < 1 && volume > 0) {
+	console.log(volume);
+	interview1audio.volume = volume;
+	interview2audio.volume = volume;
+	interview3audio.volume = volume;
+	interview4audio.volume = volume;
+	}
+}
+
+function depthDisplay() {
+	let y = Math.floor(camera.position.y/-7);
+	console.log(y);
+	if (y >= 0 && y < 25) {
+		let depth = document.getElementById("d"+y);
+		console.log(depth)
+		depth.style.opacity=1;
+		let ybefore = y-1;
+		let yafter = y+1;
+
+		if (y > 0) {
+			document.getElementById("d"+ybefore).style.opacity = 0;
+		}
+		if (y < 24) {
+			document.getElementById("d"+yafter).style.opacity = 0;
+		}
+	}
 }
 
 //A function to be called every time the mouse moves
@@ -218,13 +388,22 @@ function onMouseMove(event) {
 
 		let objects = getHoveredObjects(intersections);
 
+		//glow object
 		objects.forEach((object) => {
-			console.log(object);
-			// object.material = lightMaterial;
-			object.layers.toggle( BLOOM_SCENE );
-			render();
-
+			if (object.name != "plane") {
+				object.layers.enable(BLOOM_SCENE);
+			}
+			glow = object;
 		});
+		scene.traverse(deselect);
+		//deselect
+		render();
+}
+
+function deselect(obj) {
+	if (obj!= glow) {
+		obj.layers.disable(BLOOM_SCENE);
+	} 
 }
 
 export function getHoveredObjects(objectList){
@@ -233,9 +412,7 @@ export function getHoveredObjects(objectList){
     //If it's not an array return the value
     if(!Array.isArray(objectList)){
         const objectName = objectList.object.name || "Unnamed Object";
-		if (objectName != "plane") {
-        	cardObjects.push(objectList.object);
-		}
+        cardObjects.push(objectList.object);
         return cardObjects;
     }
 
@@ -314,20 +491,15 @@ function darkenNonBloomed( obj ) {
 }
 
 function restoreMaterial( obj ) {
-
 	if ( materials[ obj.uuid ] ) {
-
 		obj.material = materials[ obj.uuid ];
 		delete materials[ obj.uuid ];
-
 	}
 
 }
 
 function disposeMaterial( obj ) {
-
 	if ( obj.material ) {
-
 		obj.material.dispose();
 
 	}
